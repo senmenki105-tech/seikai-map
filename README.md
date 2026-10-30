@@ -15,6 +15,9 @@
 | `supabase/01_schema.sql` | テーブル・履歴・権限（RLS）・差し戻し関数 |
 | `supabase/02_summarize.sql` | まとめ処理用のテーブルと関数（service_role 専用） |
 | `supabase/03_schedule.sql` | まとめ処理を毎日呼ぶスケジュール |
+| `supabase/04_privacy.sql` | 個人情報の最小化（氏名などを保存時に破棄、表示名を無作為に） |
+| `supabase/05_content_rules.sql` | URL・連絡先・禁止パターンを登録時に拒否（禁止パターンの中身はリポジトリに含めない） |
+| `terms.html` / `privacy.html` | 利用規約 / プライバシーポリシー |
 | `supabase/functions/summarize/index.ts` | まとめ処理の Edge Function |
 
 ## 公開の手順

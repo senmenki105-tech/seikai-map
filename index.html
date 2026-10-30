@@ -113,7 +113,8 @@ p{margin:0;line-height:1.7;font-size:13.5px;color:var(--ink-soft)}
   <div class="box">
     <div class="eyebrow">年齢の確認</div>
     <h1>性界地図</h1>
-    <p>このサイトは性的な嗜好を分類した文字情報を扱います。18歳以上の方のみご利用いただけます。</p>
+    <p>性界地図は、性的嗜好（性癖）どうしのつながりと広がりを調べるための資料収集の場です。用語と分類の関係だけを扱い、性的な描写や画像は扱いません。</p>
+    <p>18歳以上の方のみご利用いただけます。<a href="./terms.html" style="color:var(--accent)">利用規約</a>・<a href="./privacy.html" style="color:var(--accent)">プライバシーポリシー</a></p>
     <div class="actions"><button class="primary" id="gateYes">18歳以上です</button><button id="gateNo">18歳未満です</button></div>
     <p id="gateMsg" class="hint" hidden>18歳未満の方はご利用いただけません。</p>
   </div>
@@ -163,7 +164,7 @@ function errText(e){
   if(/term_parents_pkey/.test(m))return 'すでに親子になっています。';
   if(/terms_label_uniq|duplicate key/.test(m))return '同じ名前の用語がすでにあります。';
   if(/row-level security/.test(m))return '権限がありません。ログインと18歳以上の確認が必要です。';
-  if(/check constraint/.test(m))return '入力内容が条件を満たしていません（名前は1〜100文字）。';
+  if(/check constraint/.test(m))return '入力内容が条件を満たしていません（名前は1〜40文字）。';
   return m;
 }
 
@@ -189,9 +190,11 @@ function remoteApi(){
       const {data:{session}}=await sb.auth.getSession();
       if(!session)return null;
       const p=ok(await sb.from('profiles').select('*').eq('id',session.user.id).maybeSingle());
-      if(!p)return {id:session.user.id,name:session.user.email,role:'user',adult:false,banned:false};
-      return {id:p.id,name:p.display_name||session.user.email,role:p.role,adult:!!p.adult_confirmed_at,banned:p.is_banned};
+      if(!p)return {id:session.user.id,name:'名前未設定',role:'user',adult:false,banned:false};
+      return {id:p.id,name:p.display_name||'名前未設定',role:p.role,adult:!!p.adult_confirmed_at,banned:p.is_banned};
     },
+    async setName(name){const {data:{session}}=await sb.auth.getSession();if(!session)throw new Error('ログインが必要です');
+      ok(await sb.from('profiles').update({display_name:name}).eq('id',session.user.id))},
     async login(provider){ok(await sb.auth.signInWithOAuth({provider,options:{redirectTo:location.origin+location.pathname}}))},
     async logout(){await sb.auth.signOut()},
     async confirmAdult(){ok(await sb.rpc('confirm_adult'))},
@@ -245,14 +248,15 @@ function demoApi(){
     async login(){fail('デモモードではログインできません。Supabaseの設定を入れてください。')},
     async logout(){fail('デモモードではログアウトできません。')},
     async confirmAdult(){},
+    async setName(name){user.name=name},
     async addTerm(label,parentId){
-      label=label.trim();if(!label||label.length>100)fail('入力内容が条件を満たしていません（名前は1〜100文字）。');
+      label=label.trim();if(!label||label.length>40)fail('用語名は40文字までです');
       if(dup(label))fail('同じ名前の用語がすでにあります。');
       const t={id:seq++,label,description:null,is_hidden:false,deleted_at:null};terms.push(t);log('terms','INSERT',t.id,null,null,{...t},src);
       if(parentId!=null)await api.link(t.id,parentId);
       return String(t.id);
     },
-    async rename(id,label){const t=find(id);label=label.trim();if(!label||label.length>100)fail('入力内容が条件を満たしていません（名前は1〜100文字）。');
+    async rename(id,label){const t=find(id);label=label.trim();if(!label||label.length>40)fail('用語名は40文字までです');
       if(dup(label,t.id))fail('同じ名前の用語がすでにあります。');const o={...t};t.label=label;log('terms','UPDATE',t.id,null,o,{...t},src)},
     async remove(id){const t=find(id);const o={...t};t.deleted_at=now();log('terms','UPDATE',t.id,null,o,{...t},src)},
     async link(c,p){c=+c;p=+p;if(c===p||isAncOrSelf(c,p))fail('循環する親子関係は作れません');
@@ -506,7 +510,7 @@ function editGate(){
   if(canEdit())return '';
   if(!me)return `<div class="note">編集するにはログインしてください。<div class="actions"><button data-login="google">Googleでログイン</button><button data-login="github">GitHubでログイン</button></div></div>`;
   if(me.banned)return `<div class="note">このアカウントは編集が停止されています。</div>`;
-  return `<div class="note">編集するには、18歳以上であることの確認が必要です（取り消せません）。<div class="actions"><button class="primary" id="confirmAdult">18歳以上であることを確認</button></div></div>`;
+  return `<div class="note">編集するには、18歳以上であることの確認と<a href="./terms.html" style="color:var(--accent)">利用規約</a>への同意が必要です（取り消せません）。<div class="actions"><button class="primary" id="confirmAdult">18歳以上であり、利用規約に同意する</button></div></div>`;
 }
 
 function describe(r){
@@ -544,14 +548,15 @@ function renderPanel(){
   if(!selected||!nodes.has(selected)){
     panel.innerHTML=`<div><div class="eyebrow">凡例 · 分野</div><h1>全体図</h1></div>
     ${DEMO?`<div class="note">デモモードです。データはこのページの中だけにあり、再読み込みで元に戻ります。公開するには index.html の先頭に Supabase の URL と anon key を入れてください。</div>`:''}
-    <p>分野が陸地、用語が地点です。複数の親を持つ用語は親どうしの間に置かれ、共通の祖先が多い用語ほど近くに集まります。ズームすると下の階層の地名が現れます。</p>
+    <p>性的嗜好どうしのつながりと広がりを集める資料地図です。分野が陸地、用語が地点です。複数の親を持つ用語は親どうしの間に置かれ、共通の祖先が多い用語ほど近くに集まります。ズームすると下の階層の地名が現れます。</p>
     <div class="legend">${rootList.map(id=>`<button data-go="${esc(id)}"><i style="background:hsla(${hueOf(id)},38%,${T['--land-l']}%,.9)"></i>${esc(nodes.get(id).label)}<span class="empty">· ${list.filter(n=>rootsOf.get(n.id).includes(id)).length-1}語</span></button>`).join('')||'<span class="empty">まだ用語がありません</span>'}</div>
     ${editGate()}
-    ${canEdit()?`<div><h2>新しい分野を追加</h2><form class="row" id="addRoot"><input id="rootName" maxlength="100" placeholder="分野の名前" required><button class="primary">追加</button></form></div>`:''}
+    ${me?`<div><h2>あなたの表示名</h2><form class="row" id="setName"><input id="nameInput" maxlength="50" value="${esc(me.name)}" required aria-label="表示名"><button>変更</button></form><p class="hint" style="margin-top:6px">編集履歴に公開される名前です。本名は使わないことをおすすめします。</p></div>`:''}
+    ${canEdit()?`<div><h2>新しい分野を追加</h2><form class="row" id="addRoot"><input id="rootName" maxlength="40" placeholder="分野の名前" required><button class="primary">追加</button></form></div>`:''}
     ${isAdmin()?`<div class="hist"><h2>未対応の通報</h2><div id="reps"><span class="empty">読み込み中…</span></div></div>`:''}
     <div class="hist"><h2>最近の変更</h2><div id="hist"><span class="empty">読み込み中…</span></div></div>
     <p class="hint">地点をタップで選択、ドラッグで移動。空白のドラッグで地図を動かし、ホイールかピンチで拡大します。地点の配置はこのブラウザに保存されます。</p>
-    <p class="hint"><a href="./privacy.html" style="color:var(--accent)">プライバシーポリシー</a></p>`;
+    <p class="hint"><a href="./terms.html" style="color:var(--accent)">利用規約</a>　<a href="./privacy.html" style="color:var(--accent)">プライバシーポリシー</a></p>`;
     fillHistory(null);if(isAdmin())fillReports();
     return;
   }
@@ -560,11 +565,11 @@ function renderPanel(){
   const opts=list.filter(m=>!banned.has(m.id)).sort((a,b)=>depth.get(a.id)-depth.get(b.id));
   panel.innerHTML=`<div><div class="eyebrow">第${d+1}階層 · ${rootsOf.get(selected).map(r=>esc(nodes.get(r).label)).join(' / ')}</div><h1>${esc(n.label)}</h1>${n.hidden?'<span class="hidden-mark">非表示中（管理者のみ見えています）</span>':''}</div>
   ${editGate()}
-  ${E?`<div><h2>名前</h2><form class="row" id="rename"><input id="newLabel" maxlength="100" value="${esc(n.label)}" required aria-label="用語の名前"><button>変更</button></form></div>`:''}
+  ${E?`<div><h2>名前</h2><form class="row" id="rename"><input id="newLabel" maxlength="40" value="${esc(n.label)}" required aria-label="用語の名前"><button>変更</button></form></div>`:''}
   <div><h2>親要素 ${n.parents.length}</h2><div class="chips">${n.parents.map(p=>chip(p,E)).join('')||'<span class="empty">なし（分野の最上位）</span>'}</div></div>
   ${E?`<div><h2>親を追加</h2><div class="row"><select id="newParent" aria-label="親にする用語"><option value="">用語を選ぶ</option>${opts.map(m=>`<option value="${esc(m.id)}">${'　'.repeat(depth.get(m.id))}${esc(m.label)}</option>`).join('')}</select><button id="addParent">追加</button></div></div>`:''}
   <div><h2>子要素 ${ch.length}</h2><div class="chips">${ch.map(c=>chip(c,false)).join('')||'<span class="empty">なし</span>'}</div></div>
-  ${E?`<div><h2>子要素を追加</h2><form class="row" id="addChild"><input id="childName" maxlength="100" placeholder="新しい用語" required><button class="primary">追加</button></form></div>`:''}
+  ${E?`<div><h2>子要素を追加</h2><form class="row" id="addChild"><input id="childName" maxlength="40" placeholder="新しい用語" required><button class="primary">追加</button></form><p class="hint" style="margin-top:6px">用語名だけを登録します（40文字まで）。URL・連絡先・禁止事項は登録できません。</p></div>`:''}
   <div class="actions"><button id="back">全体図へ</button>${E?`<button id="del" class="danger">${confirmDel?'本当に削除する':'この用語を削除'}</button>`:''}${me?'<button id="report">通報</button>':''}${isAdmin()?`<button id="hide">${n.hidden?'再表示する':'非表示にする'}</button>`:''}</div>
   <div class="hist"><h2>この用語の履歴</h2><div id="hist"><span class="empty">読み込み中…</span></div></div>`;
   fillHistory(selected);
@@ -590,6 +595,8 @@ panel.addEventListener('submit',e=>{e.preventDefault();
     const pid=selected;let newId;act(async()=>{newId=await api.addTerm(name,pid)},'追加しました').then(()=>{if(newId&&nodes.has(newId)){const p=nodes.get(pid),c=nodes.get(newId);c.x=p.x+(Math.random()-.5)*60;c.y=p.y+(Math.random()-.5)*60;select(newId)}})}
   if(e.target.id==='addRoot'){const name=document.getElementById('rootName').value.trim();if(!name)return;
     let newId;act(async()=>{newId=await api.addTerm(name,null)},'分野を追加しました').then(()=>{if(newId&&nodes.has(newId)){const a=Math.random()*Math.PI*2,c=nodes.get(newId);c.x=Math.cos(a)*700;c.y=Math.sin(a)*500;goTo(newId)}})}
+  if(e.target.id==='setName'){const v=document.getElementById('nameInput').value.trim();if(!v||v.length>50)return;
+    api.setName(v).then(()=>{toast('表示名を変更しました');return refreshMe()}).catch(err=>toast(errText(err),true))}
   if(e.target.id==='rename'){const v=document.getElementById('newLabel').value.trim();if(!v||v===nodes.get(selected).label)return;act(()=>api.rename(selected,v),'名前を変更しました')}
 });
 
