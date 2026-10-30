@@ -1,0 +1,620 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>性界地図</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shippori+Mincho+B1:wght@600;800&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+// =====================================================================
+// 設定：Supabase の Project Settings → API の値を入れてください。
+// 空のままだとデモモード（データはこのページ内だけ・自分が管理者）で動きます。
+// anon key は公開して問題ないキーです（権限は RLS で守られます）。
+// service_role key は絶対にここへ書かないでください。
+// =====================================================================
+window.SEIKAI_CONFIG = {
+  supabaseUrl: 'https://mhzxdrvvvfhyromucjyh.supabase.co',
+  supabaseAnonKey: 'sb_publishable_dViVtZ2veHVjRm2liLNgCg_JjA8quoF'
+};
+</script>
+<style>
+:root{
+  --sea:#e6e2e4; --sea-grid:#d3cbcf; --ink:#2a2226; --ink-soft:#6a5c62;
+  --panel:#f8f6f7; --line:#d6ccd1; --accent:#b23a5a; --edge:#8f7d85;
+  --land-l:72; --land-a:.42;
+  --f-display:"Shippori Mincho B1","Yu Mincho",serif;
+  --f-body:"Zen Kaku Gothic New","Hiragino Sans","Yu Gothic",system-ui,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --sea:#1a1418; --sea-grid:#2a2026; --ink:#ece4e8; --ink-soft:#a8979f;
+  --panel:#211a1e; --line:#3a2e34; --accent:#f07a9a; --edge:#7a6870;
+  --land-l:34; --land-a:.5; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --sea:#1a1418; --sea-grid:#2a2026; --ink:#ece4e8; --ink-soft:#a8979f;
+  --panel:#211a1e; --line:#3a2e34; --accent:#f07a9a; --edge:#7a6870;
+  --land-l:34; --land-a:.5; color-scheme:dark}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--sea);color:var(--ink);font:14px var(--f-body);overflow:hidden}
+.app{height:100%;display:grid;grid-template-columns:1fr 340px}
+.stage{position:relative;min-width:0;overflow:hidden}
+canvas{display:block;width:100%;height:100%;touch-action:none;cursor:grab}
+canvas.dragging{cursor:grabbing}
+.topbar{position:absolute;top:12px;left:max(12px,env(safe-area-inset-left,0px));right:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;pointer-events:none}
+.topbar>*{pointer-events:auto}
+.spacer{flex:1;pointer-events:none}
+.brand{font-family:var(--f-display);font-weight:800;font-size:20px;letter-spacing:.12em;padding:6px 12px;background:var(--panel);border:1px solid var(--line);border-radius:4px}
+.badge{font-size:12px;padding:4px 8px;border-radius:999px;border:1px dashed var(--accent);color:var(--accent);background:var(--panel)}
+input,select,button,textarea{font:inherit;color:var(--ink)}
+input,select,textarea{background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:7px 10px;min-width:0}
+#search{width:200px}
+button{background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:7px 12px;cursor:pointer}
+button:hover{border-color:var(--ink-soft)}
+button:disabled{opacity:.5;cursor:default}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+button.link{border:0;background:none;padding:0;color:var(--accent);text-decoration:underline}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.auth{display:flex;gap:6px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:4px 4px 4px 10px;font-size:13px}
+.auth button{padding:4px 10px}
+.scale{position:absolute;left:max(12px,env(safe-area-inset-left,0px));bottom:12px;font-family:var(--f-mono);font-size:11px;color:var(--ink-soft);background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:6px 10px;display:flex;gap:14px;font-variant-numeric:tabular-nums}
+.scale b{color:var(--ink);font-weight:500}
+aside{background:var(--panel);border-left:1px solid var(--line);overflow-y:auto;padding-block:20px;padding-left:18px;padding-right:max(18px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:18px}
+.eyebrow{font-family:var(--f-mono);font-size:11px;letter-spacing:.08em;color:var(--ink-soft)}
+h1{font-family:var(--f-display);font-weight:800;font-size:26px;margin:4px 0 0;letter-spacing:.04em;overflow-wrap:anywhere}
+h2{font-size:13px;font-weight:700;margin:0 0 8px;color:var(--ink-soft)}
+p{margin:0;line-height:1.7;font-size:13.5px;color:var(--ink-soft)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--line);border-radius:999px;padding:3px 4px 3px 10px;font-size:13px;background:var(--sea)}
+.chip .go{border:0;background:none;padding:0;color:var(--ink)}
+.chip .x{border:0;background:none;padding:0 6px;color:var(--ink-soft);font-size:14px;line-height:1}
+.chip .x:hover{color:var(--accent)}
+.chip i{width:8px;height:8px;border-radius:50%;flex:none}
+.empty{font-size:13px;color:var(--ink-soft)}
+.row{display:flex;gap:6px}
+.row>input,.row>select{flex:1}
+.danger{color:var(--accent)}
+.legend{display:grid;gap:6px}
+.legend button{display:flex;align-items:center;gap:8px;text-align:left;border:0;padding:4px 0;background:none}
+.legend i{width:14px;height:10px;border-radius:3px;flex:none}
+.hint{font-size:12px;color:var(--ink-soft);line-height:1.6}
+.note{border:1px dashed var(--line);border-radius:6px;padding:10px;font-size:13px;line-height:1.6;color:var(--ink-soft);display:grid;gap:8px}
+.hist{display:grid;gap:0;font-size:12.5px}
+.hist li{list-style:none;display:grid;grid-template-columns:1fr auto;gap:2px 8px;padding:8px 0;border-top:1px solid var(--line)}
+.hist ul{margin:0;padding:0}
+.hist .what{color:var(--ink);overflow-wrap:anywhere}
+.hist .meta{grid-column:1;font-family:var(--f-mono);font-size:11px;color:var(--ink-soft)}
+.hist .rv{grid-row:1/3;grid-column:2;align-self:center;font-size:12px;padding:3px 8px}
+.hist .done{opacity:.5;text-decoration:line-through}
+.tag{font-size:11px;border:1px solid var(--line);border-radius:3px;padding:0 4px;margin-left:4px}
+.hidden-mark{color:var(--accent);font-size:12px}
+.actions{display:flex;gap:6px;flex-wrap:wrap}
+.toast{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);background:var(--ink);color:var(--panel);padding:8px 14px;border-radius:6px;font-size:13px;max-width:min(90%,520px);opacity:0;transition:opacity .2s;pointer-events:none}
+.toast.on{opacity:1}
+.toast.err{background:var(--accent);color:#fff}
+.gate{position:fixed;inset:0;background:var(--sea);display:flex;align-items:center;justify-content:center;z-index:10;padding:24px}
+[hidden]{display:none!important}
+.gate .box{max-width:420px;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:24px;display:grid;gap:14px}
+.gate h1{font-size:24px}
+@media (max-width:760px){
+  .app{grid-template-columns:1fr;grid-template-rows:1fr auto}
+  aside{border-left:0;border-top:1px solid var(--line);max-height:45vh;padding-block:14px}
+  #search{width:130px}
+  .brand{font-size:16px}
+}
+</style>
+</head>
+<body>
+<div class="gate" id="gate" hidden>
+  <div class="box">
+    <div class="eyebrow">年齢の確認</div>
+    <h1>性界地図</h1>
+    <p>このサイトは性的な嗜好を分類した文字情報を扱います。18歳以上の方のみご利用いただけます。</p>
+    <div class="actions"><button class="primary" id="gateYes">18歳以上です</button><button id="gateNo">18歳未満です</button></div>
+    <p id="gateMsg" class="hint" hidden>18歳未満の方はご利用いただけません。</p>
+  </div>
+</div>
+
+<div class="app">
+  <div class="stage">
+    <canvas id="map" aria-label="性界地図"></canvas>
+    <div class="topbar">
+      <div class="brand">性界地図</div>
+      <input id="search" list="terms" placeholder="用語を探す" autocomplete="off">
+      <datalist id="terms"></datalist>
+      <button id="fit">全体表示</button>
+      <button id="reload" aria-label="最新の状態を読み込む">更新</button>
+      <span class="badge" id="demoBadge" hidden>デモモード</span>
+      <span class="spacer"></span>
+      <div class="auth" id="auth"></div>
+    </div>
+    <div class="scale"><span>縮尺 <b id="zoomv">1.00</b>×</span><span>表示階層 <b id="depthv">1</b></span><span>用語 <b id="countv">0</b></span></div>
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  </div>
+  <aside id="panel"></aside>
+</div>
+
+<script>
+(()=>{
+// =====================================================================
+// データの出入口（Supabase版とデモ版で同じ関数をそろえる）
+// =====================================================================
+const CFG=window.SEIKAI_CONFIG||{};
+const DEMO=!(CFG.supabaseUrl&&CFG.supabaseAnonKey);
+
+// デモ用の題材（色）。本番ではデータベースの内容を表示します。
+const SAMPLE=[
+ ['赤',[]],['青',[]],['緑',[]],
+ ['黄',['赤','緑']],['紫',['赤','青']],['シアン',['青','緑']],['白',['赤','青','緑']],
+ ['朱色',['赤']],['紅色',['赤']],['ピンク',['赤']],['紺',['青']],['群青',['青']],['水色',['青','シアン']],
+ ['深緑',['緑']],['黄緑',['緑','黄']],['抹茶色',['緑']],['オレンジ色',['赤','黄']],['ターコイズ',['シアン']],
+ ['りんご',['赤']],['いちご',['赤']],['トマト',['赤']],['ポスト',['赤']],
+ ['空',['水色']],['海',['青']],['ジーンズ',['紺']],['葉',['緑']],['きゅうり',['深緑']],['メロン',['黄緑']],
+ ['レモン',['黄']],['バナナ',['黄']],['みかん',['オレンジ色']],['ぶどう',['紫']],['ナス',['紫']],['桜',['ピンク']],['雪',['白']],
+ ['信号機',['赤','黄','緑']],['地球',['青','緑']]
+];
+
+function errText(e){
+  const m=e?.message||String(e);
+  if(/term_parents_pkey/.test(m))return 'すでに親子になっています。';
+  if(/terms_label_uniq|duplicate key/.test(m))return '同じ名前の用語がすでにあります。';
+  if(/row-level security/.test(m))return '権限がありません。ログインと18歳以上の確認が必要です。';
+  if(/check constraint/.test(m))return '入力内容が条件を満たしていません（名前は1〜100文字）。';
+  return m;
+}
+
+function remoteApi(){
+  const sb=supabase.createClient(CFG.supabaseUrl,CFG.supabaseAnonKey);
+  const ok=r=>{if(r.error)throw r.error;return r.data};
+  async function fetchAll(make){
+    const out=[];
+    for(let from=0;;from+=1000){const d=ok(await make().range(from,from+999));out.push(...d);if(d.length<1000)break}
+    return out;
+  }
+  return {
+    demo:false,
+    onAuth(cb){sb.auth.onAuthStateChange(()=>cb())},
+    async load(){
+      const [terms,edges]=await Promise.all([
+        fetchAll(()=>sb.from('terms').select('id,label,is_hidden').is('deleted_at',null).order('id')),
+        fetchAll(()=>sb.from('term_parents').select('child_id,parent_id').order('child_id').order('parent_id'))
+      ]);
+      return {terms,edges};
+    },
+    async me(){
+      const {data:{session}}=await sb.auth.getSession();
+      if(!session)return null;
+      const p=ok(await sb.from('profiles').select('*').eq('id',session.user.id).maybeSingle());
+      if(!p)return {id:session.user.id,name:session.user.email,role:'user',adult:false,banned:false};
+      return {id:p.id,name:p.display_name||session.user.email,role:p.role,adult:!!p.adult_confirmed_at,banned:p.is_banned};
+    },
+    async login(provider){ok(await sb.auth.signInWithOAuth({provider,options:{redirectTo:location.origin+location.pathname}}))},
+    async logout(){await sb.auth.signOut()},
+    async confirmAdult(){ok(await sb.rpc('confirm_adult'))},
+    async addTerm(label,parentId){
+      const t=ok(await sb.from('terms').insert({label}).select('id').single());
+      if(parentId!=null)ok(await sb.from('term_parents').insert({child_id:t.id,parent_id:+parentId}));
+      return String(t.id);
+    },
+    async rename(id,label){ok(await sb.from('terms').update({label}).eq('id',+id))},
+    async remove(id){ok(await sb.rpc('soft_delete_term',{p_term_id:+id}))},
+    async link(c,p){ok(await sb.from('term_parents').insert({child_id:+c,parent_id:+p}))},
+    async unlink(c,p){ok(await sb.from('term_parents').delete().eq('child_id',+c).eq('parent_id',+p))},
+    async setHidden(id,h){ok(await sb.from('terms').update({is_hidden:h}).eq('id',+id))},
+    async history(id){
+      let q=sb.from('revisions').select('*').order('id',{ascending:false}).limit(40);
+      if(id!=null)q=q.or(`term_id.eq.${+id},parent_id.eq.${+id}`);
+      const revs=ok(await q);
+      const ids=[...new Set(revs.map(r=>r.actor).filter(Boolean))];
+      const names=new Map();
+      if(ids.length)ok(await sb.from('profiles').select('id,display_name').in('id',ids)).forEach(p=>names.set(p.id,p.display_name));
+      return revs.map(r=>({...r,actorName:names.get(r.actor)}));
+    },
+    async revert(revId){ok(await sb.rpc('revert_revision',{p_revision_id:revId}))},
+    async report(id,reason){ok(await sb.from('reports').insert({term_id:+id,reason}))},
+    async reports(){return ok(await sb.from('reports').select('id,term_id,reason,created_at').eq('status','open').order('id',{ascending:false}).limit(30))},
+    async resolveReport(id,status){ok(await sb.from('reports').update({status}).eq('id',id))}
+  };
+}
+
+function demoApi(){
+  let seq=1,rseq=1,pseq=1;
+  const terms=[],edges=[],revs=[],reps=[];
+  const user={id:'demo',name:'デモ利用者',role:'admin',adult:true,banned:false};
+  const now=()=>new Date().toISOString();
+  const alive=()=>terms.filter(t=>!t.deleted_at);
+  const find=id=>terms.find(t=>t.id===+id);
+  const log=(table_name,op,term_id,parent_id,old_data,new_data,source)=>revs.push({id:rseq++,table_name,op,term_id,parent_id,old_data,new_data,actor:user.id,actorName:user.name,source:source||'user',created_at:now(),reverted_at:null});
+  const dup=(label,except)=>alive().some(t=>t.id!==except&&t.label.trim().toLowerCase()===label.trim().toLowerCase());
+  const isAncOrSelf=(a,b)=>{const st=[b],seen=new Set();while(st.length){const x=st.pop();if(x===a)return true;if(seen.has(x))continue;seen.add(x);edges.filter(e=>e.child_id===x).forEach(e=>st.push(e.parent_id))}return false};
+  const ids={};
+  SAMPLE.forEach(([l])=>{const t={id:seq++,label:l,description:null,is_hidden:false,deleted_at:null};terms.push(t);ids[l]=t.id});
+  SAMPLE.forEach(([l,ps])=>ps.forEach(p=>edges.push({child_id:ids[l],parent_id:ids[p]})));
+  const fail=m=>{throw new Error(m)};
+  let src;
+  const api={
+    demo:true,
+    onAuth(){},
+    async load(){const live=new Set(alive().map(t=>t.id));
+      return {terms:alive().map(t=>({...t})),edges:edges.filter(e=>live.has(e.child_id)&&live.has(e.parent_id)).map(e=>({...e}))}},
+    async me(){return user},
+    async login(){fail('デモモードではログインできません。Supabaseの設定を入れてください。')},
+    async logout(){fail('デモモードではログアウトできません。')},
+    async confirmAdult(){},
+    async addTerm(label,parentId){
+      label=label.trim();if(!label||label.length>100)fail('入力内容が条件を満たしていません（名前は1〜100文字）。');
+      if(dup(label))fail('同じ名前の用語がすでにあります。');
+      const t={id:seq++,label,description:null,is_hidden:false,deleted_at:null};terms.push(t);log('terms','INSERT',t.id,null,null,{...t},src);
+      if(parentId!=null)await api.link(t.id,parentId);
+      return String(t.id);
+    },
+    async rename(id,label){const t=find(id);label=label.trim();if(!label||label.length>100)fail('入力内容が条件を満たしていません（名前は1〜100文字）。');
+      if(dup(label,t.id))fail('同じ名前の用語がすでにあります。');const o={...t};t.label=label;log('terms','UPDATE',t.id,null,o,{...t},src)},
+    async remove(id){const t=find(id);const o={...t};t.deleted_at=now();log('terms','UPDATE',t.id,null,o,{...t},src)},
+    async link(c,p){c=+c;p=+p;if(c===p||isAncOrSelf(c,p))fail('循環する親子関係は作れません');
+      if(edges.some(e=>e.child_id===c&&e.parent_id===p))fail('すでに親子になっています。');
+      const e={child_id:c,parent_id:p};edges.push(e);log('term_parents','INSERT',c,p,null,{...e},src)},
+    async unlink(c,p){c=+c;p=+p;const i=edges.findIndex(e=>e.child_id===c&&e.parent_id===p);if(i<0)return;
+      const [e]=edges.splice(i,1);log('term_parents','DELETE',c,p,{...e},null,src)},
+    async setHidden(id,h){const t=find(id);const o={...t};t.is_hidden=h;log('terms','UPDATE',t.id,null,o,{...t},src)},
+    async history(id){return revs.filter(r=>id==null||r.term_id===+id||r.parent_id===+id).slice().reverse().slice(0,40).map(r=>({...r}))},
+    async revert(revId){
+      const r=revs.find(x=>x.id===revId);if(!r)fail('履歴が見つかりません');if(r.reverted_at)fail('この履歴は差し戻し済みです');
+      src='revert';
+      try{
+        if(r.table_name==='terms'){
+          const t=find(r.term_id);
+          if(r.op==='INSERT'){const o={...t};t.deleted_at=now();log('terms','UPDATE',t.id,null,o,{...t},src)}
+          else if(r.op==='UPDATE'){if(r.old_data.deleted_at==null&&dup(r.old_data.label,t.id))fail('同じ名前の用語がすでにあります。');
+            const o={...t};Object.assign(t,{label:r.old_data.label,is_hidden:r.old_data.is_hidden,deleted_at:r.old_data.deleted_at});log('terms','UPDATE',t.id,null,o,{...t},src)}
+        }else{
+          if(r.op==='INSERT')await api.unlink(r.term_id,r.parent_id);
+          else if(!edges.some(e=>e.child_id===r.term_id&&e.parent_id===r.parent_id))await api.link(r.term_id,r.parent_id);
+        }
+        r.reverted_at=now();
+      }finally{src=undefined}
+    },
+    async report(id,reason){reps.push({id:pseq++,term_id:+id,reason,created_at:now(),status:'open'})},
+    async reports(){return reps.filter(r=>r.status==='open').slice().reverse()},
+    async resolveReport(id,status){const r=reps.find(x=>x.id===id);if(r)r.status=status}
+  };
+  return api;
+}
+
+const api=DEMO?demoApi():remoteApi();
+
+// =====================================================================
+// 状態
+// =====================================================================
+let nodes=new Map(), selected=null, me=null, loaded=false;
+const canEdit=()=>!!(me&&me.adult&&!me.banned);
+const isAdmin=()=>me?.role==='admin';
+const POSKEY=DEMO?'seikai-demo-pos':'seikai-pos';
+function loadPos(){try{return JSON.parse(localStorage.getItem(POSKEY)||'{}')}catch(e){return{}}}
+function savePos(){try{const o={};nodes.forEach(n=>o[n.id]=[Math.round(n.x),Math.round(n.y)]);localStorage.setItem(POSKEY,JSON.stringify(o))}catch(e){}}
+
+function setData({terms,edges}){
+  const old=nodes,pos=loadPos();let fresh=0;
+  nodes=new Map();
+  for(const t of terms){const id=String(t.id),o=old.get(id),p=pos[id];
+    nodes.set(id,{id,label:t.label,hidden:!!t.is_hidden,parents:[],x:o?.x??p?.[0],y:o?.y??p?.[1],vx:0,vy:0});
+    if(!o&&!p)fresh++}
+  for(const e of edges){const c=nodes.get(String(e.child_id)),pid=String(e.parent_id);if(c&&nodes.has(pid)&&!c.parents.includes(pid))c.parents.push(pid)}
+  const roots=[...nodes.values()].filter(n=>!n.parents.length);
+  roots.forEach((r,i)=>{if(r.x==null){const a=i/Math.max(1,roots.length)*Math.PI*2;r.x=Math.cos(a)*520;r.y=Math.sin(a)*380}});
+  for(const n of order())if(n.x==null){const ps=n.parents.map(id=>nodes.get(id)).filter(p=>p.x!=null);
+    if(!ps.length){n.x=(Math.random()-.5)*400;n.y=(Math.random()-.5)*400;continue}
+    n.x=ps.reduce((s,p)=>s+p.x,0)/ps.length+(Math.random()-.5)*80;n.y=ps.reduce((s,p)=>s+p.y,0)/ps.length+(Math.random()-.5)*80}
+  if(selected&&!nodes.has(selected))selected=null;
+  rebuild();alpha=Math.max(alpha,fresh>nodes.size/2?1:fresh?0.5:0.15);dirty=true;
+}
+
+async function reload(focus){
+  try{setData(await api.load());loaded=true;if(focus)selected=focus}
+  catch(e){toast('読み込みに失敗しました：'+errText(e),true)}
+  renderPanel();
+}
+async function refreshMe(){try{me=await api.me()}catch(e){me=null;toast(errText(e),true)}renderAuth();renderPanel()}
+
+let toastTimer;
+function toast(m,err){const t=document.getElementById('toast');t.textContent=m;t.className='toast on'+(err?' err':'');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.className='toast'+(err?' err':''),err?5000:2500)}
+async function act(fn,okMsg,focus){
+  try{await fn();if(okMsg)toast(okMsg);await reload(focus)}
+  catch(e){toast(errText(e),true)}
+}
+
+// ---- graph derived data ----
+let depth=new Map(),anc=new Map(),rootsOf=new Map(),kids=new Map(),list=[],sim=[],rootList=[];
+function order(){const out=[],seen=new Set();const visit=n=>{if(seen.has(n.id))return;seen.add(n.id);n.parents.forEach(p=>nodes.has(p)&&visit(nodes.get(p)));out.push(n)};nodes.forEach(visit);return out}
+function rebuild(){
+  list=order();depth.clear();anc.clear();rootsOf.clear();kids.clear();
+  list.forEach(n=>kids.set(n.id,[]));
+  for(const n of list){
+    const a=new Set();let d=0,rs=[];
+    n.parents.forEach(p=>{if(!anc.has(p))return;a.add(p);anc.get(p).forEach(x=>a.add(x));d=Math.max(d,depth.get(p)+1);rootsOf.get(p).forEach(r=>rs.includes(r)||rs.push(r));kids.get(p).push(n.id)});
+    if(!rs.length)rs=[n.id];
+    depth.set(n.id,d);anc.set(n.id,a);rootsOf.set(n.id,rs);
+  }
+  rootList=list.filter(n=>depth.get(n.id)===0).map(n=>n.id);
+  // 関連度 = 祖先集合(自身含む)のJaccard係数
+  const sets=list.map(n=>new Set([...anc.get(n.id),n.id]));
+  sim=list.map((_,i)=>list.map((_,j)=>{if(i>=j)return 0;let c=0;sets[i].forEach(x=>sets[j].has(x)&&c++);return c/(sets[i].size+sets[j].size-c)}));
+  document.getElementById('terms').innerHTML=list.map(n=>`<option value="${esc(n.label)}">`).join('');
+  document.getElementById('countv').textContent=list.length;
+}
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const HUES=[340,200,140,265,38,175,8,95];
+const DEMO_HUE={'赤':0,'青':218,'緑':128};
+const hueOf=id=>{const n=nodes.get(id);if(DEMO&&n&&DEMO_HUE[n.label]!=null)return DEMO_HUE[n.label];return HUES[Math.max(0,rootList.indexOf(id))%HUES.length]};
+
+// ---- force layout ----
+let alpha=1,dirty=true;
+const LINK=[0,300,150,95,70,60],W=[7,3,1.4,1,1,1];
+function step(){
+  if(alpha<0.004)return false;
+  const n=list.length;
+  for(let i=0;i<n;i++){const a=list[i],da=Math.min(depth.get(a.id),5);
+    for(let j=i+1;j<n;j++){const b=list[j],db=Math.min(depth.get(b.id),5);
+      let dx=b.x-a.x,dy=b.y-a.y,d2=dx*dx+dy*dy;if(d2<1){dx=Math.random()-.5;dy=Math.random()-.5;d2=1}
+      const d=Math.sqrt(d2);let f=-2600*W[da]*W[db]/Math.max(d2,400);
+      const s=sim[i][j];if(s>0)f+=(d-(50+420*(1-s)))*0.004*s;
+      const fx=f*dx/d,fy=f*dy/d;a.vx+=fx/W[da];a.vy+=fy/W[da];b.vx-=fx/W[db];b.vy-=fy/W[db]}}
+  for(const c of list){const L=LINK[Math.min(depth.get(c.id),5)];
+    for(const pid of c.parents){const p=nodes.get(pid);const dx=p.x-c.x,dy=p.y-c.y,d=Math.hypot(dx,dy)||1;
+      const f=(d-L)*0.06/Math.sqrt(c.parents.length);c.vx+=f*dx/d;c.vy+=f*dy/d;p.vx-=f*dx/d*.25;p.vy-=f*dy/d*.25}}
+  for(const v of list){const rs=rootsOf.get(v.id);
+    if(depth.get(v.id)>0){let cx=0,cy=0;rs.forEach(r=>{const q=nodes.get(r);cx+=q.x;cy+=q.y});cx/=rs.length;cy/=rs.length;v.vx+=(cx-v.x)*0.012;v.vy+=(cy-v.y)*0.012}
+    v.vx-=v.x*0.0015;v.vy-=v.y*0.0015;
+    if(v===drag?.node){v.vx=v.vy=0;continue}
+    v.vx*=0.6;v.vy*=0.6;const sp=Math.hypot(v.vx,v.vy),m=40;if(sp>m){v.vx*=m/sp;v.vy*=m/sp}
+    v.x+=v.vx*alpha;v.y+=v.vy*alpha}
+  const acc=new Map(rootList.map(r=>[r,[0,0,0]]));
+  for(const v of list){if(!depth.get(v.id))continue;for(const r of rootsOf.get(v.id)){const a=acc.get(r);if(a){a[0]+=v.x;a[1]+=v.y;a[2]++}}}
+  for(const[r,a]of acc){if(!a[2])continue;const q=nodes.get(r);if(q===drag?.node)continue;q.x+=(a[0]/a[2]-q.x)*0.04*alpha;q.y+=(a[1]/a[2]-q.y)*0.04*alpha}
+  alpha*=0.992;if(alpha<0.004)savePos();
+  return true;
+}
+
+// ---- view ----
+const cv=document.getElementById('map'),ctx=cv.getContext('2d');
+let cam={x:0,y:0,z:0.7},W0=0,H0=0,dpr=1;
+function resize(){const r=cv.getBoundingClientRect();dpr=window.devicePixelRatio||1;W0=r.width;H0=r.height;cv.width=W0*dpr;cv.height=H0*dpr;dirty=true}
+new ResizeObserver(resize).observe(cv);
+const TH=[-9,0.55,1.05,1.7,2.5,3.3];
+const vis=d=>Math.max(0,Math.min(1,(cam.z-TH[Math.min(d,5)])/0.3));
+const toS=(x,y)=>[(x-cam.x)*cam.z+W0/2,(y-cam.y)*cam.z+H0/2];
+const toW=(sx,sy)=>[(sx-W0/2)/cam.z+cam.x,(sy-H0/2)/cam.z+cam.y];
+let T={};function readTokens(){const cs=getComputedStyle(document.documentElement);['--sea','--sea-grid','--ink','--ink-soft','--accent','--edge','--panel','--land-l','--land-a','--f-display','--f-body','--f-mono'].forEach(k=>T[k]=cs.getPropertyValue(k).trim());dirty=true}
+readTokens();matchMedia('(prefers-color-scheme: dark)').addEventListener('change',readTokens);
+
+const CELL=12,MS={1:[[3,2]],2:[[2,1]],3:[[3,1]],4:[[0,1]],5:[[0,1],[3,2]],6:[[0,2]],7:[[3,0]],8:[[3,0]],9:[[0,2]],10:[[3,0],[2,1]],11:[[0,1]],12:[[3,1]],13:[[2,1]],14:[[3,2]]};
+// 分野ごとの「領土」：所属する用語と親子の線に沿って置いた点からなるなめらかな場の等高線
+function regionLoops(rid){
+  const blobs=[],z=cam.z;
+  for(const n of list){if(!rootsOf.get(n.id).includes(rid))continue;const d=depth.get(n.id),[x,y]=toS(n.x,n.y);
+    blobs.push([x,y,(d===0?95:d===1?62:48)*z,1]);
+    for(const pid of n.parents){if(!rootsOf.get(pid)?.includes(rid))continue;const p=nodes.get(pid),len=Math.hypot(p.x-n.x,p.y-n.y),k=Math.max(1,Math.floor(len/45));
+      for(let t=1;t<k;t++){const[sx,sy]=toS(n.x+(p.x-n.x)*t/k,n.y+(p.y-n.y)*t/k);blobs.push([sx,sy,34*z,.9])}}}
+  if(!blobs.length)return[];
+  let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;for(const[x,y,r]of blobs){x0=Math.min(x0,x-2.2*r);y0=Math.min(y0,y-2.2*r);x1=Math.max(x1,x+2.2*r);y1=Math.max(y1,y+2.2*r)}
+  x0=Math.max(x0,-60);y0=Math.max(y0,-60);x1=Math.min(x1,W0+60);y1=Math.min(y1,H0+60);if(x1<=x0||y1<=y0)return[];
+  const cols=Math.ceil((x1-x0)/CELL)+1,rows=Math.ceil((y1-y0)/CELL)+1,F=new Float32Array(cols*rows);
+  for(const[bx,by,r,w]of blobs){const R=2.2*r,i0=Math.max(1,Math.floor((bx-R-x0)/CELL)),i1=Math.min(cols-2,Math.ceil((bx+R-x0)/CELL)),j0=Math.max(1,Math.floor((by-R-y0)/CELL)),j1=Math.min(rows-2,Math.ceil((by+R-y0)/CELL)),r2=r*r;
+    for(let j=j0;j<=j1;j++){const dy=y0+j*CELL-by;for(let i=i0;i<=i1;i++){const dx=x0+i*CELL-bx;F[j*cols+i]+=w*Math.exp(-(dx*dx+dy*dy)/r2)}}}
+  const THR=.5,pts=new Map(),adj=new Map(),segs=[];
+  const ept=(i,j,e)=>{const key=e===0?`h${i},${j}`:e===1?`v${i+1},${j}`:e===2?`h${i},${j+1}`:`v${i},${j}`;
+    if(!pts.has(key)){let a,b,ax,ay,bx2,by2;
+      if(e===0||e===2){const jj=e===0?j:j+1;a=F[jj*cols+i];b=F[jj*cols+i+1];ax=i;bx2=i+1;ay=by2=jj}else{const ii=e===1?i+1:i;a=F[j*cols+ii];b=F[(j+1)*cols+ii];ay=j;by2=j+1;ax=bx2=ii}
+      const t=(THR-a)/(b-a||1e-6);pts.set(key,[x0+(ax+(bx2-ax)*t)*CELL,y0+(ay+(by2-ay)*t)*CELL])}return key};
+  for(let j=0;j<rows-1;j++)for(let i=0;i<cols-1;i++){const c=(F[j*cols+i]>THR)*8+(F[j*cols+i+1]>THR)*4+(F[(j+1)*cols+i+1]>THR)*2+(F[(j+1)*cols+i]>THR);
+    const m=MS[c];if(!m)continue;for(const[ea,eb]of m){const a=ept(i,j,ea),b=ept(i,j,eb),k=segs.length;segs.push([a,b]);
+      (adj.get(a)||adj.set(a,[]).get(a)).push(k);(adj.get(b)||adj.set(b,[]).get(b)).push(k)}}
+  const used=new Uint8Array(segs.length),loops=[];
+  for(let s0=0;s0<segs.length;s0++){if(used[s0])continue;used[s0]=1;const loop=[segs[s0][0]];let cur=segs[s0][1];
+    while(cur!==loop[0]){loop.push(cur);const nx=(adj.get(cur)||[]).find(k=>!used[k]);if(nx==null)break;used[nx]=1;cur=segs[nx][0]===cur?segs[nx][1]:segs[nx][0]}
+    if(loop.length>3)loops.push(loop.map(k=>pts.get(k)))}
+  return loops}
+function focusSet(){if(!selected||!nodes.has(selected))return null;return new Set([selected,...nodes.get(selected).parents,...kids.get(selected)])}
+
+function draw(){
+  ctx.setTransform(dpr,0,0,dpr,0,0);ctx.fillStyle=T['--sea'];ctx.fillRect(0,0,W0,H0);
+  const g=cam.z<0.6?400:cam.z<1.5?200:100;const[x0,y0]=toW(0,0),[x1,y1]=toW(W0,H0);
+  ctx.strokeStyle=T['--sea-grid'];ctx.lineWidth=1;ctx.fillStyle=T['--ink-soft'];ctx.font=`10px ${T['--f-mono']}`;ctx.globalAlpha=1;
+  for(let x=Math.floor(x0/g)*g;x<x1;x+=g){const[sx]=toS(x,0);ctx.beginPath();ctx.moveTo(sx,0);ctx.lineTo(sx,H0);ctx.stroke();ctx.globalAlpha=.6;ctx.fillText((x>=0?'E':'W')+Math.abs(x/10|0),sx+3,H0-40);ctx.globalAlpha=1}
+  for(let y=Math.floor(y0/g)*g;y<y1;y+=g){const[,sy]=toS(0,y);ctx.beginPath();ctx.moveTo(0,sy);ctx.lineTo(W0,sy);ctx.stroke();ctx.globalAlpha=.6;ctx.fillText((y>=0?'S':'N')+Math.abs(y/10|0),W0-34,sy-3);ctx.globalAlpha=1}
+  if(!loaded){ctx.fillStyle=T['--ink-soft'];ctx.font=`14px ${T['--f-body']}`;ctx.textAlign='center';ctx.fillText('読み込み中…',W0/2,H0/2);return}
+  const L=+T['--land-l'],LA=+T['--land-a'],F=focusSet();
+  for(const rid of rootList){const h=hueOf(rid),loops=regionLoops(rid);if(!loops.length)continue;
+    ctx.beginPath();for(const lp of loops){const n=lp.length,mid=(a,b)=>[(a[0]+b[0])/2,(a[1]+b[1])/2];let m=mid(lp[n-1],lp[0]);ctx.moveTo(m[0],m[1]);
+      for(let i=0;i<n;i++){const p=lp[i];m=mid(p,lp[(i+1)%n]);ctx.quadraticCurveTo(p[0],p[1],m[0],m[1])}ctx.closePath()}
+    ctx.fillStyle=`hsla(${h},38%,${L}%,${LA})`;ctx.fill('evenodd');ctx.strokeStyle=`hsla(${h},40%,${L-22}%,.55)`;ctx.lineWidth=1.2;ctx.setLineDash([5,4]);ctx.stroke();ctx.setLineDash([])}
+  for(const c of list){const dc=depth.get(c.id);
+    for(const pid of c.parents){const p=nodes.get(pid);let v=Math.min(vis(dc),vis(depth.get(pid)));const hl=F&&(c.id===selected||pid===selected);
+      if(F&&!hl)v*=.25;if(hl)v=1;if(v<=0.01)continue;
+      const[ax,ay]=toS(c.x,c.y),[bx,by]=toS(p.x,p.y);ctx.globalAlpha=v*(hl?1:.7);ctx.strokeStyle=hl?T['--accent']:T['--edge'];ctx.lineWidth=hl?2:Math.max(.8,2.2-dc*.4);
+      const mx=(ax+bx)/2+(by-ay)*.08,my=(ay+by)/2-(bx-ax)*.08;ctx.beginPath();ctx.moveTo(ax,ay);ctx.quadraticCurveTo(mx,my,bx,by);ctx.stroke()}}
+  ctx.globalAlpha=1;
+  for(const n of list){const d=depth.get(n.id);let v=vis(d);const inF=F&&F.has(n.id);if(inF)v=1;else if(F)v*=.35;if(v<=0.01)continue;
+    const[sx,sy]=toS(n.x,n.y);if(sx<-200||sx>W0+200||sy<-60||sy>H0+60)continue;
+    const rs=rootsOf.get(n.id),h=hueOf(rs[0]);ctx.globalAlpha=v*(n.hidden?.45:1);
+    if(d===0){ctx.font=`800 ${Math.round(17+cam.z*5)}px ${T['--f-display']}`;ctx.textAlign='center';ctx.fillStyle=n.id===selected?T['--accent']:T['--ink'];
+      ctx.letterSpacing='0.25em';ctx.fillText(n.label,sx,sy+6);ctx.letterSpacing='0px';continue}
+    const r=d===1?6:d===2?4.5:3.5;
+    ctx.beginPath();ctx.arc(sx,sy,r,0,Math.PI*2);ctx.fillStyle=`hsl(${h},45%,${L>50?38:62}%)`;ctx.fill();
+    if(rs.length>1){ctx.lineWidth=2.4;ctx.strokeStyle=`hsl(${hueOf(rs[1])},50%,${L>50?45:65}%)`;ctx.stroke()}
+    if(n.id===selected){ctx.beginPath();ctx.arc(sx,sy,r+5,0,Math.PI*2);ctx.lineWidth=2;ctx.strokeStyle=T['--accent'];ctx.stroke()}
+    ctx.font=`${d===1?700:500} ${d===1?14:12}px ${T['--f-body']}`;ctx.textAlign='left';
+    ctx.lineWidth=3.5;ctx.strokeStyle=T['--sea'];ctx.lineJoin='round';ctx.strokeText(n.label,sx+r+4,sy+4);
+    ctx.fillStyle=n.id===selected?T['--accent']:T['--ink'];ctx.fillText(n.label,sx+r+4,sy+4)}
+  ctx.globalAlpha=1;
+  document.getElementById('zoomv').textContent=cam.z.toFixed(2);
+  let md=0;for(let d=1;d<6;d++)if(vis(d)>0.5)md=d;document.getElementById('depthv').textContent=md+1;
+}
+let fly=null;
+function loop(){const moving=loaded&&step();if(fly){const t=Math.min(1,(performance.now()-fly.t0)/500),e=1-Math.pow(1-t,3);
+  cam.x=fly.a.x+(fly.b.x-fly.a.x)*e;cam.y=fly.a.y+(fly.b.y-fly.a.y)*e;cam.z=fly.a.z+(fly.b.z-fly.a.z)*e;if(t>=1)fly=null;dirty=true}
+  if(moving||dirty){draw();dirty=false}requestAnimationFrame(loop)}
+function flyTo(b){if(matchMedia('(prefers-reduced-motion: reduce)').matches){cam=b;dirty=true;return}fly={a:{...cam},b,t0:performance.now()}}
+function fit(){if(!list.length)return;let a=1e9,b=1e9,c=-1e9,d=-1e9;list.forEach(n=>{a=Math.min(a,n.x);b=Math.min(b,n.y);c=Math.max(c,n.x);d=Math.max(d,n.y)});
+  const z=Math.min(W0/(c-a+380),H0/(d-b+300));flyTo({x:(a+c)/2,y:(b+d)/2,z:Math.max(.2,Math.min(z,1.4))})}
+
+// ---- pointer ----
+const ptrs=new Map();let drag=null,pinch=null;
+function hit(sx,sy){let best=null,bd=22*22;const F=focusSet();for(const n of list){if(vis(depth.get(n.id))<.3&&!F?.has(n.id))continue;const[x,y]=toS(n.x,n.y);const dd=(x-sx)**2+(y-sy)**2;if(dd<bd){bd=dd;best=n}}return best}
+cv.addEventListener('pointerdown',e=>{cv.setPointerCapture(e.pointerId);const r=cv.getBoundingClientRect();ptrs.set(e.pointerId,{x:e.clientX-r.left,y:e.clientY-r.top});fly=null;
+  if(ptrs.size===2){drag=null;const[p,q]=[...ptrs.values()];pinch={d:Math.hypot(p.x-q.x,p.y-q.y),z:cam.z,c:toW((p.x+q.x)/2,(p.y+q.y)/2)};return}
+  const p=ptrs.get(e.pointerId);drag={node:hit(p.x,p.y),sx:p.x,sy:p.y,cam:{...cam},moved:false};cv.classList.add('dragging')});
+cv.addEventListener('pointermove',e=>{if(!ptrs.has(e.pointerId))return;const r=cv.getBoundingClientRect();const p={x:e.clientX-r.left,y:e.clientY-r.top};ptrs.set(e.pointerId,p);
+  if(pinch&&ptrs.size===2){const[a,b]=[...ptrs.values()];cam.z=Math.max(.2,Math.min(5,pinch.z*Math.hypot(a.x-b.x,a.y-b.y)/pinch.d));
+    const mx=(a.x+b.x)/2,my=(a.y+b.y)/2;cam.x=pinch.c[0]-(mx-W0/2)/cam.z;cam.y=pinch.c[1]-(my-H0/2)/cam.z;dirty=true;return}
+  if(!drag)return;if(Math.hypot(p.x-drag.sx,p.y-drag.sy)>4)drag.moved=true;if(!drag.moved)return;
+  if(drag.node){const[w0,w1]=toW(p.x,p.y);drag.node.x=w0;drag.node.y=w1;alpha=Math.max(alpha,.25)}
+  else{cam.x=drag.cam.x-(p.x-drag.sx)/cam.z;cam.y=drag.cam.y-(p.y-drag.sy)/cam.z}dirty=true});
+function up(e){ptrs.delete(e.pointerId);if(ptrs.size<2)pinch=null;if(!drag)return;
+  if(!drag.moved)select(drag.node?drag.node.id:null);else if(drag.node)savePos();drag=null;cv.classList.remove('dragging')}
+cv.addEventListener('pointerup',up);cv.addEventListener('pointercancel',up);
+cv.addEventListener('wheel',e=>{e.preventDefault();fly=null;const r=cv.getBoundingClientRect(),sx=e.clientX-r.left,sy=e.clientY-r.top;const[wx,wy]=toW(sx,sy);
+  cam.z=Math.max(.2,Math.min(5,cam.z*Math.exp(-e.deltaY*0.0015)));cam.x=wx-(sx-W0/2)/cam.z;cam.y=wy-(sy-H0/2)/cam.z;dirty=true},{passive:false});
+
+// =====================================================================
+// ログイン表示
+// =====================================================================
+function renderAuth(){
+  const el=document.getElementById('auth');
+  if(DEMO){el.innerHTML=`<span>${esc(me?.name)}</span><span class="tag">管理者</span>`;return}
+  if(!me){el.innerHTML=`<span>ログイン</span><button data-login="google">Google</button><button data-login="github">GitHub</button>`;return}
+  el.innerHTML=`<span>${esc(me.name)}</span>${isAdmin()?'<span class="tag">管理者</span>':''}<button id="logout">ログアウト</button>`;
+}
+document.getElementById('auth').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
+  if(b.dataset.login)api.login(b.dataset.login).catch(err=>toast(errText(err),true));
+  if(b.id==='logout')api.logout().then(refreshMe).catch(err=>toast(errText(err),true))});
+
+// =====================================================================
+// 右パネル
+// =====================================================================
+const panel=document.getElementById('panel');
+let confirmDel=false,histToken=0;
+function select(id){selected=id;confirmDel=false;renderPanel();dirty=true}
+function goTo(id){const n=nodes.get(id);if(!n)return;select(id);flyTo({x:n.x,y:n.y,z:Math.max(cam.z,TH[Math.min(depth.get(id),5)]+.45,0.5)})}
+function chip(id,removable){const h=hueOf(rootsOf.get(id)[0]);return `<span class="chip"><i style="background:hsl(${h},45%,45%)"></i><button class="go" data-go="${esc(id)}">${esc(nodes.get(id).label)}</button>${removable?`<button class="x" data-unlink="${esc(id)}" aria-label="親から外す">×</button>`:'<span style="width:6px"></span>'}</span>`}
+
+function editGate(){
+  if(canEdit())return '';
+  if(!me)return `<div class="note">編集するにはログインしてください。<div class="actions"><button data-login="google">Googleでログイン</button><button data-login="github">GitHubでログイン</button></div></div>`;
+  if(me.banned)return `<div class="note">このアカウントは編集が停止されています。</div>`;
+  return `<div class="note">編集するには、18歳以上であることの確認が必要です（取り消せません）。<div class="actions"><button class="primary" id="confirmAdult">18歳以上であることを確認</button></div></div>`;
+}
+
+function describe(r){
+  const lab=(id,data)=>data?.label??nodes.get(String(id))?.label??`#${id}`;
+  if(r.table_name==='terms'){
+    const o=r.old_data,n=r.new_data,name=esc(lab(r.term_id,n||o));
+    if(r.op==='INSERT')return `「${name}」を追加`;
+    if(r.op==='DELETE')return `「${name}」を完全削除`;
+    if(o.deleted_at==null&&n.deleted_at!=null)return `「${name}」を削除`;
+    if(o.deleted_at!=null&&n.deleted_at==null)return `「${name}」を復元`;
+    if(o.is_hidden!==n.is_hidden)return `「${name}」を${n.is_hidden?'非表示':'再表示'}`;
+    if(o.label!==n.label)return `「${esc(o.label)}」→「${esc(n.label)}」に改名`;
+    return `「${name}」を更新`;
+  }
+  const c=esc(lab(r.term_id)),p=esc(lab(r.parent_id));
+  return r.op==='INSERT'?`「${c}」の親に「${p}」を追加`:`「${c}」を「${p}」から外す`;
+}
+function who(r){return r.source==='system'?'まとめ処理':r.source==='revert'?`差し戻し（${esc(r.actorName||'管理者')}）`:esc(r.actorName||'不明')}
+const fmt=s=>{const d=new Date(s);return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`};
+async function fillHistory(id){
+  const tok=++histToken,el=document.getElementById('hist');if(!el)return;
+  try{
+    const revs=await api.history(id);if(tok!==histToken)return;
+    el.innerHTML=revs.length?`<ul>${revs.map(r=>`<li><span class="what ${r.reverted_at?'done':''}">${describe(r)}</span><span class="meta">${fmt(r.created_at)} · ${who(r)}</span>${isAdmin()&&!r.reverted_at?`<button class="rv" data-revert="${r.id}">差し戻す</button>`:''}</li>`).join('')}</ul>`:'<span class="empty">まだ履歴がありません</span>';
+  }catch(e){if(tok===histToken)el.innerHTML=`<span class="empty">履歴を読み込めませんでした：${esc(errText(e))}</span>`}
+}
+async function fillReports(){
+  const el=document.getElementById('reps');if(!el)return;
+  try{const rs=await api.reports();
+    el.innerHTML=rs.length?`<ul>${rs.map(r=>`<li><span class="what">${nodes.has(String(r.term_id))?`<button class="link" data-go="${r.term_id}">${esc(nodes.get(String(r.term_id)).label)}</button>`:`#${r.term_id}`}：${esc(r.reason)}</span><span class="meta">${fmt(r.created_at)}</span><span class="rv" style="display:flex;gap:4px"><button data-resolve="${r.id}">対応済み</button><button data-dismiss="${r.id}">却下</button></span></li>`).join('')}</ul>`:'<span class="empty">未対応の通報はありません</span>';
+  }catch(e){el.innerHTML=`<span class="empty">${esc(errText(e))}</span>`}
+}
+
+function renderPanel(){
+  if(!selected||!nodes.has(selected)){
+    panel.innerHTML=`<div><div class="eyebrow">凡例 · 分野</div><h1>全体図</h1></div>
+    ${DEMO?`<div class="note">デモモードです。データはこのページの中だけにあり、再読み込みで元に戻ります。公開するには index.html の先頭に Supabase の URL と anon key を入れてください。</div>`:''}
+    <p>分野が陸地、用語が地点です。複数の親を持つ用語は親どうしの間に置かれ、共通の祖先が多い用語ほど近くに集まります。ズームすると下の階層の地名が現れます。</p>
+    <div class="legend">${rootList.map(id=>`<button data-go="${esc(id)}"><i style="background:hsla(${hueOf(id)},38%,${T['--land-l']}%,.9)"></i>${esc(nodes.get(id).label)}<span class="empty">· ${list.filter(n=>rootsOf.get(n.id).includes(id)).length-1}語</span></button>`).join('')||'<span class="empty">まだ用語がありません</span>'}</div>
+    ${editGate()}
+    ${canEdit()?`<div><h2>新しい分野を追加</h2><form class="row" id="addRoot"><input id="rootName" maxlength="100" placeholder="分野の名前" required><button class="primary">追加</button></form></div>`:''}
+    ${isAdmin()?`<div class="hist"><h2>未対応の通報</h2><div id="reps"><span class="empty">読み込み中…</span></div></div>`:''}
+    <div class="hist"><h2>最近の変更</h2><div id="hist"><span class="empty">読み込み中…</span></div></div>
+    <p class="hint">地点をタップで選択、ドラッグで移動。空白のドラッグで地図を動かし、ホイールかピンチで拡大します。地点の配置はこのブラウザに保存されます。</p>`;
+    fillHistory(null);if(isAdmin())fillReports();
+    return;
+  }
+  const n=nodes.get(selected),d=depth.get(selected),ch=kids.get(selected),E=canEdit();
+  const banned=new Set([selected,...n.parents]);list.forEach(m=>{if(anc.get(m.id).has(selected))banned.add(m.id)});
+  const opts=list.filter(m=>!banned.has(m.id)).sort((a,b)=>depth.get(a.id)-depth.get(b.id));
+  panel.innerHTML=`<div><div class="eyebrow">第${d+1}階層 · ${rootsOf.get(selected).map(r=>esc(nodes.get(r).label)).join(' / ')}</div><h1>${esc(n.label)}</h1>${n.hidden?'<span class="hidden-mark">非表示中（管理者のみ見えています）</span>':''}</div>
+  ${editGate()}
+  ${E?`<div><h2>名前</h2><form class="row" id="rename"><input id="newLabel" maxlength="100" value="${esc(n.label)}" required aria-label="用語の名前"><button>変更</button></form></div>`:''}
+  <div><h2>親要素 ${n.parents.length}</h2><div class="chips">${n.parents.map(p=>chip(p,E)).join('')||'<span class="empty">なし（分野の最上位）</span>'}</div></div>
+  ${E?`<div><h2>親を追加</h2><div class="row"><select id="newParent" aria-label="親にする用語"><option value="">用語を選ぶ</option>${opts.map(m=>`<option value="${esc(m.id)}">${'　'.repeat(depth.get(m.id))}${esc(m.label)}</option>`).join('')}</select><button id="addParent">追加</button></div></div>`:''}
+  <div><h2>子要素 ${ch.length}</h2><div class="chips">${ch.map(c=>chip(c,false)).join('')||'<span class="empty">なし</span>'}</div></div>
+  ${E?`<div><h2>子要素を追加</h2><form class="row" id="addChild"><input id="childName" maxlength="100" placeholder="新しい用語" required><button class="primary">追加</button></form></div>`:''}
+  <div class="actions"><button id="back">全体図へ</button>${E?`<button id="del" class="danger">${confirmDel?'本当に削除する':'この用語を削除'}</button>`:''}${me?'<button id="report">通報</button>':''}${isAdmin()?`<button id="hide">${n.hidden?'再表示する':'非表示にする'}</button>`:''}</div>
+  <div class="hist"><h2>この用語の履歴</h2><div id="hist"><span class="empty">読み込み中…</span></div></div>`;
+  fillHistory(selected);
+}
+
+panel.addEventListener('click',e=>{const t=e.target.closest('button');if(!t||(t.form&&t.type==='submit'))return;
+  if(t.dataset.go){goTo(String(t.dataset.go));return}
+  if(t.dataset.login){api.login(t.dataset.login).catch(err=>toast(errText(err),true));return}
+  if(t.id==='confirmAdult'){api.confirmAdult().then(refreshMe).catch(err=>toast(errText(err),true));return}
+  if(t.dataset.revert){if(!confirm('この変更を差し戻しますか？'))return;act(()=>api.revert(+t.dataset.revert),'差し戻しました');return}
+  if(t.dataset.resolve){api.resolveReport(+t.dataset.resolve,'resolved').then(fillReports);return}
+  if(t.dataset.dismiss){api.resolveReport(+t.dataset.dismiss,'dismissed').then(fillReports);return}
+  if(t.dataset.unlink){act(()=>api.unlink(selected,t.dataset.unlink),'親から外しました');return}
+  if(t.id==='addParent'){const v=document.getElementById('newParent').value;if(!v)return;act(()=>api.link(selected,v),'親を追加しました');return}
+  if(t.id==='back'){select(null);fit();return}
+  if(t.id==='del'){if(!confirmDel){confirmDel=true;renderPanel();return}const id=selected;confirmDel=false;selected=null;act(()=>api.remove(id),'削除しました');return}
+  if(t.id==='hide'){const n=nodes.get(selected);act(()=>api.setHidden(selected,!n.hidden),n.hidden?'再表示しました':'非表示にしました');return}
+  if(t.id==='report'){const reason=prompt('通報の理由を入力してください（1000文字まで）');if(!reason||!reason.trim())return;
+    api.report(selected,reason.trim().slice(0,1000)).then(()=>toast('通報しました。ありがとうございます。')).catch(err=>toast(errText(err),true));return}
+});
+panel.addEventListener('submit',e=>{e.preventDefault();
+  if(e.target.id==='addChild'){const name=document.getElementById('childName').value.trim();if(!name)return;
+    const pid=selected;let newId;act(async()=>{newId=await api.addTerm(name,pid)},'追加しました').then(()=>{if(newId&&nodes.has(newId)){const p=nodes.get(pid),c=nodes.get(newId);c.x=p.x+(Math.random()-.5)*60;c.y=p.y+(Math.random()-.5)*60;select(newId)}})}
+  if(e.target.id==='addRoot'){const name=document.getElementById('rootName').value.trim();if(!name)return;
+    let newId;act(async()=>{newId=await api.addTerm(name,null)},'分野を追加しました').then(()=>{if(newId&&nodes.has(newId)){const a=Math.random()*Math.PI*2,c=nodes.get(newId);c.x=Math.cos(a)*700;c.y=Math.sin(a)*500;goTo(newId)}})}
+  if(e.target.id==='rename'){const v=document.getElementById('newLabel').value.trim();if(!v||v===nodes.get(selected).label)return;act(()=>api.rename(selected,v),'名前を変更しました')}
+});
+
+document.getElementById('fit').onclick=fit;
+document.getElementById('reload').onclick=()=>reload().then(()=>toast('最新の状態にしました'));
+document.getElementById('search').addEventListener('change',e=>{const q=e.target.value.trim();if(!q)return;const n=list.find(m=>m.label===q)||list.find(m=>m.label.toLowerCase().includes(q.toLowerCase()));if(n){goTo(n.id);e.target.value=''}else toast('見つかりませんでした')});
+addEventListener('keydown',e=>{if(e.key==='Escape'&&!/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName))select(null)});
+
+// ---- 年齢確認（閲覧） ----
+const gate=document.getElementById('gate');
+let ageOk=false;try{ageOk=localStorage.getItem('seikai-age-ok')==='1'}catch(e){}
+gate.hidden=ageOk;
+document.getElementById('gateYes').onclick=()=>{try{localStorage.setItem('seikai-age-ok','1')}catch(e){}gate.hidden=true};
+document.getElementById('gateNo').onclick=()=>{document.getElementById('gateMsg').hidden=false};
+
+// ---- 起動 ----
+document.getElementById('demoBadge').hidden=!DEMO;
+api.onAuth(refreshMe);
+resize();renderAuth();renderPanel();requestAnimationFrame(loop);
+(async()=>{
+  await refreshMe();
+  await reload();
+  for(let i=0;i<350;i++)step();
+  resize();fit();if(fly){cam={...fly.b};fly=null}dirty=true;
+})();
+})();
+</script>
+</body>
+</html>
