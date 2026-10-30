@@ -199,9 +199,8 @@ function remoteApi(){
     async logout(){await sb.auth.signOut()},
     async confirmAdult(){ok(await sb.rpc('confirm_adult'))},
     async addTerm(label,parentId){
-      const t=ok(await sb.from('terms').insert({label}).select('id').single());
-      if(parentId!=null)ok(await sb.from('term_parents').insert({child_id:t.id,parent_id:+parentId}));
-      return String(t.id);
+      const id=ok(await sb.rpc('add_term',{p_label:label,p_parent:parentId==null?null:+parentId}));
+      return String(id);
     },
     async rename(id,label){ok(await sb.from('terms').update({label}).eq('id',+id))},
     async remove(id){ok(await sb.rpc('soft_delete_term',{p_term_id:+id}))},
@@ -220,7 +219,9 @@ function remoteApi(){
     async revert(revId){ok(await sb.rpc('revert_revision',{p_revision_id:revId}))},
     async report(id,reason){ok(await sb.from('reports').insert({term_id:+id,reason}))},
     async reports(){return ok(await sb.from('reports').select('id,term_id,reason,created_at').eq('status','open').order('id',{ascending:false}).limit(30))},
-    async resolveReport(id,status){ok(await sb.from('reports').update({status}).eq('id',id))}
+    async resolveReport(id,status){ok(await sb.from('reports').update({status}).eq('id',id))},
+    async banUser(id,banned){ok(await sb.rpc('ban_user',{p_user_id:id,p_banned:banned}))},
+    async bannedUsers(){return ok(await sb.from('profiles').select('id,display_name').eq('is_banned',true).order('display_name'))}
   };
 }
 
@@ -284,7 +285,9 @@ function demoApi(){
     },
     async report(id,reason){reps.push({id:pseq++,term_id:+id,reason,created_at:now(),status:'open'})},
     async reports(){return reps.filter(r=>r.status==='open').slice().reverse()},
-    async resolveReport(id,status){const r=reps.find(x=>x.id===id);if(r)r.status=status}
+    async resolveReport(id,status){const r=reps.find(x=>x.id===id);if(r)r.status=status},
+    async banUser(){fail('デモモードには他の利用者がいません。')},
+    async bannedUsers(){return []}
   };
   return api;
 }
@@ -534,8 +537,14 @@ async function fillHistory(id){
   const tok=++histToken,el=document.getElementById('hist');if(!el)return;
   try{
     const revs=await api.history(id);if(tok!==histToken)return;
-    el.innerHTML=revs.length?`<ul>${revs.map(r=>`<li><span class="what ${r.reverted_at?'done':''}">${describe(r)}</span><span class="meta">${fmt(r.created_at)} · ${who(r)}</span>${isAdmin()&&!r.reverted_at?`<button class="rv" data-revert="${r.id}">差し戻す</button>`:''}</li>`).join('')}</ul>`:'<span class="empty">まだ履歴がありません</span>';
+    el.innerHTML=revs.length?`<ul>${revs.map(r=>`<li><span class="what ${r.reverted_at?'done':''}">${describe(r)}</span><span class="meta">${fmt(r.created_at)} · ${who(r)}${isAdmin()&&r.actor&&r.actor!==me?.id&&r.source==='user'?` · <button class="link" data-ban="${esc(r.actor)}" data-name="${esc(r.actorName||'')}">この利用者を停止</button>`:''}</span>${isAdmin()&&!r.reverted_at?`<button class="rv" data-revert="${r.id}">差し戻す</button>`:''}</li>`).join('')}</ul>`:'<span class="empty">まだ履歴がありません</span>';
   }catch(e){if(tok===histToken)el.innerHTML=`<span class="empty">履歴を読み込めませんでした：${esc(errText(e))}</span>`}
+}
+async function fillBans(){
+  const el=document.getElementById('bans');if(!el)return;
+  try{const us=await api.bannedUsers();
+    el.innerHTML=us.length?`<ul>${us.map(u=>`<li><span class="what">${esc(u.display_name||'名前未設定')}</span><span class="meta">ログイン・編集を停止中</span><button class="rv" data-unban="${esc(u.id)}">解除</button></li>`).join('')}</ul>`:'<span class="empty">停止中の利用者はいません</span>';
+  }catch(e){el.innerHTML=`<span class="empty">${esc(errText(e))}</span>`}
 }
 async function fillReports(){
   const el=document.getElementById('reps');if(!el)return;
@@ -553,11 +562,11 @@ function renderPanel(){
     ${editGate()}
     ${me?`<div><h2>あなたの表示名</h2><form class="row" id="setName"><input id="nameInput" maxlength="50" value="${esc(me.name)}" required aria-label="表示名"><button>変更</button></form><p class="hint" style="margin-top:6px">編集履歴に公開される名前です。本名は使わないことをおすすめします。</p></div>`:''}
     ${canEdit()?`<div><h2>新しい分野を追加</h2><form class="row" id="addRoot"><input id="rootName" maxlength="40" placeholder="分野の名前" required><button class="primary">追加</button></form></div>`:''}
-    ${isAdmin()?`<div class="hist"><h2>未対応の通報</h2><div id="reps"><span class="empty">読み込み中…</span></div></div>`:''}
+    ${isAdmin()?`<div class="hist"><h2>未対応の通報</h2><div id="reps"><span class="empty">読み込み中…</span></div></div><div class="hist"><h2>停止中の利用者</h2><div id="bans"><span class="empty">読み込み中…</span></div></div>`:''}
     <div class="hist"><h2>最近の変更</h2><div id="hist"><span class="empty">読み込み中…</span></div></div>
     <p class="hint">地点をタップで選択、ドラッグで移動。空白のドラッグで地図を動かし、ホイールかピンチで拡大します。地点の配置はこのブラウザに保存されます。</p>
     <p class="hint"><a href="./terms.html" style="color:var(--accent)">利用規約</a>　<a href="./privacy.html" style="color:var(--accent)">プライバシーポリシー</a></p>`;
-    fillHistory(null);if(isAdmin())fillReports();
+    fillHistory(null);if(isAdmin()){fillReports();fillBans()}
     return;
   }
   const n=nodes.get(selected),d=depth.get(selected),ch=kids.get(selected),E=canEdit();
@@ -580,6 +589,9 @@ panel.addEventListener('click',e=>{const t=e.target.closest('button');if(!t||(t.
   if(t.dataset.login){api.login(t.dataset.login).catch(err=>toast(errText(err),true));return}
   if(t.id==='confirmAdult'){api.confirmAdult().then(refreshMe).catch(err=>toast(errText(err),true));return}
   if(t.dataset.revert){if(!confirm('この変更を差し戻しますか？'))return;act(()=>api.revert(+t.dataset.revert),'差し戻しました');return}
+  if(t.dataset.ban){const name=t.dataset.name||'この利用者';if(!confirm(`「${name}」のログインと編集を停止しますか？\n（全体図の「停止中の利用者」からいつでも解除できます）`))return;
+    api.banUser(t.dataset.ban,true).then(()=>{toast('利用者を停止しました');renderPanel()}).catch(err=>toast(errText(err),true));return}
+  if(t.dataset.unban){api.banUser(t.dataset.unban,false).then(()=>{toast('停止を解除しました');fillBans()}).catch(err=>toast(errText(err),true));return}
   if(t.dataset.resolve){api.resolveReport(+t.dataset.resolve,'resolved').then(fillReports);return}
   if(t.dataset.dismiss){api.resolveReport(+t.dataset.dismiss,'dismissed').then(fillReports);return}
   if(t.dataset.unlink){act(()=>api.unlink(selected,t.dataset.unlink),'親から外しました');return}
@@ -615,6 +627,9 @@ document.getElementById('gateNo').onclick=()=>{document.getElementById('gateMsg'
 // ---- 起動 ----
 document.getElementById('demoBadge').hidden=!DEMO;
 api.onAuth(refreshMe);
+// ログインの失敗（停止中のアカウントなど）は、戻ってきたURLに理由が付く
+(()=>{const q=new URLSearchParams(location.hash.slice(1)+'&'+location.search.slice(1));const d=q.get('error_description');
+  if(d){setTimeout(()=>toast(/banned/i.test(d)?'このアカウントは停止されています。':'ログインできませんでした：'+d,true),300);try{history.replaceState(null,'',location.pathname)}catch(e){}}})();
 resize();renderAuth();renderPanel();requestAnimationFrame(loop);
 (async()=>{
   await refreshMe();

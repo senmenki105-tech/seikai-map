@@ -17,6 +17,7 @@
 | `supabase/03_schedule.sql` | まとめ処理を毎日呼ぶスケジュール |
 | `supabase/04_privacy.sql` | 個人情報の最小化（氏名などを保存時に破棄、表示名を無作為に） |
 | `supabase/05_content_rules.sql` | URL・連絡先・禁止パターンを登録時に拒否（禁止パターンの中身はリポジトリに含めない） |
+| `supabase/06_rate_limit_and_ban.sql` | 書き込みを1時間に10件までに制限、管理者による利用者の停止（ログイン拒否） |
 | `terms.html` / `privacy.html` | 利用規約 / プライバシーポリシー |
 | `supabase/functions/summarize/index.ts` | まとめ処理の Edge Function |
 
