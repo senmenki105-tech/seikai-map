@@ -550,7 +550,8 @@ function renderPanel(){
     ${canEdit()?`<div><h2>新しい分野を追加</h2><form class="row" id="addRoot"><input id="rootName" maxlength="100" placeholder="分野の名前" required><button class="primary">追加</button></form></div>`:''}
     ${isAdmin()?`<div class="hist"><h2>未対応の通報</h2><div id="reps"><span class="empty">読み込み中…</span></div></div>`:''}
     <div class="hist"><h2>最近の変更</h2><div id="hist"><span class="empty">読み込み中…</span></div></div>
-    <p class="hint">地点をタップで選択、ドラッグで移動。空白のドラッグで地図を動かし、ホイールかピンチで拡大します。地点の配置はこのブラウザに保存されます。</p>`;
+    <p class="hint">地点をタップで選択、ドラッグで移動。空白のドラッグで地図を動かし、ホイールかピンチで拡大します。地点の配置はこのブラウザに保存されます。</p>
+    <p class="hint"><a href="./privacy.html" style="color:var(--accent)">プライバシーポリシー</a></p>`;
     fillHistory(null);if(isAdmin())fillReports();
     return;
   }
